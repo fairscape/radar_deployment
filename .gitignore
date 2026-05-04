@@ -1,0 +1,14 @@
+# Local env (copy of .env.example with secrets / host paths)
+.env
+
+# Bind-mount state directories — never commit user data
+data/
+vault/
+chroma/
+ollama/
+
+# Editor / OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp

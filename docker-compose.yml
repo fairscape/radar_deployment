@@ -1,0 +1,133 @@
+# RADAR — single-host docker-compose.
+#
+# Two always-on services (backend, frontend) and two LLM services
+# gated behind `--profile llm` (ollama runtime + a one-shot ollama-init
+# that pulls the model). Persistent state lives in bind-mounts under
+# this directory so `docker compose down` does not eat your DB / vault
+# / chroma index / model weights.
+#
+# Bring up:
+#   cp .env.example .env
+#   docker compose --profile llm up -d        # full demo, with chat
+#   docker compose up -d                      # no chat (skips ollama)
+#
+# See radar/README.md for the full quickstart and demo script.
+
+services:
+
+  # ---------------------------------------------------------------------
+  # FastAPI backend. CMD runs `cli.db init` (idempotent) before uvicorn,
+  # so a fresh checkout becomes a working API on first boot.
+  # ---------------------------------------------------------------------
+  backend:
+    build:
+      context: ./radar-backend
+      dockerfile: Dockerfile
+    image: radar-backend:local
+    container_name: radar-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      # Host paths default to ./data, ./vault, ./chroma; override via
+      # RADAR_HOST_*_DIR in .env to relocate state (e.g. /home/oj/radar/data).
+      - ${RADAR_HOST_DATA_DIR:-./data}:/app/data        # SQLite + migration log
+      - ${RADAR_HOST_VAULT_DIR:-./vault}:/app/vault     # per-user PDFs + feedback.jsonl
+      - ${RADAR_HOST_CHROMA_DIR:-./chroma}:/app/chroma  # vector index for RAG chat
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    # No hard `depends_on: ollama` here — the API tolerates ollama
+    # being absent (the chat route returns 503 with an actionable
+    # message), and compose silently skips dependencies on services
+    # that aren't created when their profile isn't active. Listing
+    # ollama with `required: false` would work on Compose v2.20+ but
+    # we'd rather not pin to that version for a soft hint.
+
+  # ---------------------------------------------------------------------
+  # React SPA served by nginx on :5173. Browser hits the backend on the
+  # host port (:8000) directly — nginx does NOT proxy /api/*. Backend
+  # CORS already whitelists http://localhost:5173.
+  # ---------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./radar-website
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:8000
+        VITE_USE_MOCK: "0"
+    image: radar-frontend:local
+    container_name: radar-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+  # ---------------------------------------------------------------------
+  # Ollama. Profile-gated so a no-LLM run (e.g. CI smoke test, or a
+  # demo box without GPU/disk for the 4 GB model) can `docker compose
+  # up` without pulling weights. Start with `--profile llm` to enable.
+  # ---------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    container_name: radar-ollama
+    restart: unless-stopped
+    profiles: ["llm"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ${RADAR_HOST_OLLAMA_DIR:-./ollama}:/root/.ollama  # model weights persist across `down`
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  # ---------------------------------------------------------------------
+  # One-shot model puller. Runs `ollama pull $RADAR_OLLAMA_MODEL` once
+  # and exits 0 — re-running compose with the model already present is
+  # a no-op (ollama short-circuits when the layer hash matches). On the
+  # first run this can take 5–15 min for a ~4 GB model; subsequent
+  # compose ups are instant because weights live in the ./ollama
+  # bind-mount.
+  # ---------------------------------------------------------------------
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: radar-ollama-init
+    profiles: ["llm"]
+    restart: "no"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: "http://ollama:11434"
+      RADAR_OLLAMA_MODEL: "${RADAR_OLLAMA_MODEL:-llama3.1:8b}"
+      RADAR_CHAT_EMBEDDING_MODEL: "${RADAR_CHAT_EMBEDDING_MODEL:-mxbai-embed-large}"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Pulling Ollama LLM: $${RADAR_OLLAMA_MODEL}"
+        ollama pull "$${RADAR_OLLAMA_MODEL}"
+        if [ -n "$${RADAR_CHAT_EMBEDDING_MODEL}" ]; then
+          echo "Pulling Ollama embedder: $${RADAR_CHAT_EMBEDDING_MODEL}"
+          ollama pull "$${RADAR_CHAT_EMBEDDING_MODEL}"
+        fi
+        echo "Pull complete."
+
+# Named volumes are unused intentionally — bind-mounts under the repo
+# root keep state visible/editable on the host and easy to back up by
+# tar'ing the radar/ directory.
