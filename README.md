@@ -1,9 +1,7 @@
 # RADAR — Deployment
 
-Docker Compose deployment for RADAR. Pulls pre-built images of the
-[backend](https://github.com/fairscape/radar_backend) and
-[frontend](https://github.com/fairscape/radar_frontend) (or builds them
-from source if you clone those repos as siblings) and wires them up
+Docker Compose deployment for RADAR. Builds iamges
+from source (you must clone them into the dir) and wires them up
 with an optional bundled Ollama for the chat feature.
 
 ## Prerequisites
