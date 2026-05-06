@@ -8,6 +8,12 @@ chroma/
 ollama/
 logs/
 
+# Sibling app repos cloned into this directory by the README's
+# quickstart. Each has its own .git and its own remote — not tracked
+# from here.
+radar-backend/
+radar-website/
+
 # Editor / OS noise
 .DS_Store
 .idea/
