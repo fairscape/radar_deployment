@@ -28,14 +28,19 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      # Persist app logs to the mounted ./logs directory. Override
+      # RADAR_LOG_FILE in .env to disable (set empty) or relocate.
+      RADAR_LOG_FILE: ${RADAR_LOG_FILE:-/app/logs/radar.log}
     ports:
       - "8000:8000"
     volumes:
-      # Host paths default to ./data, ./vault, ./chroma; override via
-      # RADAR_HOST_*_DIR in .env to relocate state (e.g. /home/oj/radar/data).
+      # Host paths default to ./data, ./vault, ./chroma, ./logs; override
+      # via RADAR_HOST_*_DIR in .env to relocate state.
       - ${RADAR_HOST_DATA_DIR:-./data}:/app/data        # SQLite + migration log
       - ${RADAR_HOST_VAULT_DIR:-./vault}:/app/vault     # per-user PDFs + feedback.jsonl
       - ${RADAR_HOST_CHROMA_DIR:-./chroma}:/app/chroma  # vector index for RAG chat
+      - ${RADAR_HOST_LOGS_DIR:-./logs}:/app/logs        # rotating app log files
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/health"]
       interval: 15s

@@ -6,6 +6,7 @@ data/
 vault/
 chroma/
 ollama/
+logs/
 
 # Editor / OS noise
 .DS_Store
