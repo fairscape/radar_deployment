@@ -23,8 +23,8 @@ cd radar_deployment
 
 # Clone backend + frontend as siblings (the compose build context
 # points at ../radar-backend and ../radar-website — see note below).
-git clone https://github.com/fairscape/radar_backend.git ../radar-backend
-git clone https://github.com/fairscape/radar_frontend.git ../radar-website
+git clone https://github.com/fairscape/radar_backend.git ./radar-backend
+git clone https://github.com/fairscape/radar_frontend.git ./radar-website
 
 cp .env.example .env
 
@@ -54,7 +54,7 @@ curl http://localhost:8000/api/health
 Four bind-mounts under this directory, all created on first `up`:
 
 | Path        | Contents                                          |
-|-------------|---------------------------------------------------|
+| ----------- | ------------------------------------------------- |
 | `./data/`   | `radar.db` SQLite + WAL/SHM sidecars.             |
 | `./vault/`  | Per-user PDFs and `feedback.jsonl`.               |
 | `./chroma/` | Per-user Chroma collections (vault chunk index).  |
