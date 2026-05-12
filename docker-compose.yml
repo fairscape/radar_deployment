@@ -20,10 +20,7 @@ services:
   # so a fresh checkout becomes a working API on first boot.
   # ---------------------------------------------------------------------
   backend:
-    build:
-      context: ./radar-backend
-      dockerfile: Dockerfile
-    image: radar-backend:local
+    image: ghcr.io/fairscape/radar_backend:latest
     container_name: radar-backend
     restart: unless-stopped
     env_file:
@@ -60,13 +57,7 @@ services:
   # CORS already whitelists http://localhost:5173.
   # ---------------------------------------------------------------------
   frontend:
-    build:
-      context: ./radar-website
-      dockerfile: Dockerfile
-      args:
-        VITE_API_BASE_URL: http://localhost:8000
-        VITE_USE_MOCK: "0"
-    image: radar-frontend:local
+    image: ghcr.io/fairscape/radar_website:latest
     container_name: radar-frontend
     restart: unless-stopped
     ports:
