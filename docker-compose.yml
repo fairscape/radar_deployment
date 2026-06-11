@@ -57,7 +57,7 @@ services:
   # CORS already whitelists http://localhost:5173.
   # ---------------------------------------------------------------------
   frontend:
-    image: ghcr.io/fairscape/radar_website:latest
+    image: ghcr.io/fairscape/radar_frontend:latest
     container_name: radar-frontend
     restart: unless-stopped
     ports:
